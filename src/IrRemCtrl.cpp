@@ -1,6 +1,6 @@
+#include "BoardPin.h"
 #include "IrRemCtrl.h"
 
-const uint16_t recvPin = 2;    // Infrared receiving pin
 IRrecv irrecv(recvPin);         // Create a class object used to receive class
 decode_results results;         // Create a decoding results class object
 

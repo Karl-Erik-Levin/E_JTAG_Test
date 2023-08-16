@@ -1,16 +1,8 @@
 #include <Arduino.h>
+
+#include "BoardPin.h"
 #include "DispU8G2.h"
 #include "IrRemCtrl.h"
-
-// Set LED_BUILTIN if it is not defined by Arduino framework
-#ifndef LED_BUILTIN
-  #define LED_BUILTIN 27
-#endif
-#define LED_RED 25
-#define LED_GREEN 33
-#define LED_BLUE 32
-#define KEY_0 16
-#define KEY_1 17
 
 void blink();
 void statusLed(uint8_t but);
@@ -110,8 +102,8 @@ void statusLed(uint8_t but) {
 }
 
 uint8_t readPot(uint8_t pot) {
-  uint8_t portPin = A6;
-  if (pot == 1) portPin = A7;
+  uint8_t portPin = POT0;
+  if (pot == 1) portPin = POT1;
 
   long val = analogRead(portPin);
   return map(val , 0, 4095, 0, 255);
