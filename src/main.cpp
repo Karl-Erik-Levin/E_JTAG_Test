@@ -1,13 +1,16 @@
 #include <Arduino.h>
+#include <SPI.h>
 
 #include "BoardPin.h"
 #include "DispU8G2.h"
 #include "IrRemCtrl.h"
+#include "Weather.h"
 
 void blink();
 void statusLed(uint8_t but);
 uint8_t readPot(uint8_t pot);
 uint8_t readBut(void);
+uint8_t hour=8, minute=48, second=12;
 
 void setup() {
   Serial.begin(115200);
@@ -21,15 +24,16 @@ void setup() {
 
   DispInit();
   IrInit();
+  PresInit();
 }
 
 void loop() {
   static uint32_t task1, task1Interval=100;
   static uint32_t task2, task2Interval=100;
-  static char dispMes2[40];
+  static uint32_t task3, task3Interval=1000;
   static IrKey irOld;
   static uint8_t cnt;
-  char dispMes1[40], dispMes3[40];
+  static char dMess0[40], dMess1[40], dMess2[40], dMess3[40];
 
 
   //      T A S K   1       //
@@ -45,19 +49,30 @@ void loop() {
 
     DispClear();
     
-    if (irOld==IR_MENU) {
-      DispPage(dispMes2, 0, 1, (cnt%4==0));
-      DispPage("ncenB10_tr", 1, 1, (cnt%4==1));
-      DispPage("KalleLevin", 2, 1, (cnt%4==2));
-      DispPage("ncenB10_te", 3, 1, (cnt%4==3));
-    } else {
-      sprintf(dispMes1, "LoopIntv = %d", task1Interval);
-      sprintf(dispMes3, "IrKey= %d", irOld);
-      DispPrint(0, dispMes1);
-      DispPrint(1, dispMes2);
-      DispPrint(2, dispMes3);
-      DispPrint(3, dispMes3);
-    }
+    if (irOld==IR_ON) {
+//      sprintf(dMess2, "IrKey   = %d", irOld);
+      strcpy(dMess0, "Input");
+      strcpy(dMess1, "");
+      sprintf(dMess2, "LoopIntv= %d", task1Interval);
+      DispPage(dMess0, 0, 0, 0);
+      DispPage(dMess1, 1, 2, 0);
+      DispPage(dMess2, 2, 2, 0);
+      DispPage(dMess3, 3, 2, 0);
+    } else if (irOld==IR_MENU) {
+      PresCheck(dMess2);
+      TempCheck(dMess3);
+      DispPage("BMP180", 0, 0, 0);
+      DispPage("", 1, 2, 0);
+      DispPage(dMess2, 2, 2, 0);
+      DispPage(dMess3, 3, 2, 0);
+    } else if (irOld==IR_C) {
+      DispPage("ncenB10_tf", 0, 0, (cnt%4==0));
+      DispPage("ncenR10_tf", 1, 1, (cnt%4==1));
+      DispPage("helvR10_tf", 2, 2, (cnt%4==2));
+      DispPage("courR12_tf", 3, 3, (cnt%4==3));
+    } else
+      DispClock(hour, minute, second);
+
     DispBuffer();
 
     blink();
@@ -69,7 +84,22 @@ void loop() {
 
     uint8_t but = readBut();
     statusLed(but);
-    sprintf(dispMes2, "Button = %d", but);
+    sprintf(dMess3, "Button  = %d", but);
+  }
+
+  //      T A S K   3       //
+ if (millis() > task3) {
+    task3 = millis() + task3Interval;
+
+    if (++second > 59) {
+      second = 0;
+      if (++minute > 59) {
+        minute = 0;
+        if (++hour > 23) {
+          hour = 0;
+        }
+      }
+    }
   }
 }
 
@@ -85,17 +115,17 @@ void blink() {
 }
 
 void statusLed(uint8_t but) {
-  if (but&1)
+  if (but==1)
     digitalWrite(LED_RED, HIGH);
   else
     digitalWrite(LED_RED, LOW);
 
-  if (but&2)
+  if (but==2)
     digitalWrite(LED_GREEN, HIGH);
   else
     digitalWrite(LED_GREEN, LOW);
 
-  if (but&4)
+  if (but==3)
     digitalWrite(LED_BLUE, HIGH);
   else
     digitalWrite(LED_BLUE, LOW);
