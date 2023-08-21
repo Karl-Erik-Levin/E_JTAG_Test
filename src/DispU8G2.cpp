@@ -26,7 +26,7 @@ void DispClear(void) {
   u8g2.clearBuffer();
 }
 
-void DispPage(char *text, uint8_t row, uint8_t font, uint8_t selected) {
+void DispRow(char *text, uint8_t row, uint8_t font, uint8_t selected) {
   if (font==0)
     u8g2.setFont(u8g2_font_ncenB10_tf);
   else if (font==1)
@@ -47,6 +47,12 @@ void DispPage(char *text, uint8_t row, uint8_t font, uint8_t selected) {
   if (selected == 1) {
     u8g2.setDrawColor(1);
     u8g2.setFontMode(0);
+  }
+}
+
+void DispPage(dispRow row[]) {
+  for (uint8_t i=0; i<4; i++) {
+    DispRow(row[i].message, row[i].row, row[i].font, row[i].selec);
   }
 }
 

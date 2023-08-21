@@ -1,8 +1,8 @@
 #include "Weather.h"
 
 Adafruit_BMP085 bmp;
-uint32_t Pressure[] = {101300, 101300, 101300, 101300, 101300};
-const uint8_t noSamp = 5;
+uint32_t Pressure[] = {101300, 101300, 101300, 101300};
+const uint8_t noSamp = 4;
 
 void PresInit(void) {
   bmp.begin();

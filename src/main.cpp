@@ -5,12 +5,18 @@
 #include "DispU8G2.h"
 #include "IrRemCtrl.h"
 #include "Weather.h"
+#include "GY521.h"
+#include "WifiTime.h"
 
 void blink();
 void statusLed(uint8_t but);
+void PageInit(void);
 uint8_t readPot(uint8_t pot);
 uint8_t readBut(void);
+int HallRead(void);
+
 uint8_t hour=8, minute=48, second=12;
+dispRow row[4];
 
 void setup() {
   Serial.begin(115200);
@@ -25,6 +31,9 @@ void setup() {
   DispInit();
   IrInit();
   PresInit();
+  GY521Init();
+  PageInit();
+  WifiTimeInit();
 }
 
 void loop() {
@@ -35,9 +44,10 @@ void loop() {
   static uint8_t cnt;
   static char dMess0[40], dMess1[40], dMess2[40], dMess3[40];
 
-
+  //------------------------//
   //      T A S K   1       //
- if (millis() > task1) {
+  //------------------------//
+  if (millis() > task1) {
     task1 = millis() + task1Interval;
 
     task1Interval = readPot(0) + 10;
@@ -51,25 +61,59 @@ void loop() {
     
     if (irOld==IR_ON) {
 //      sprintf(dMess2, "IrKey   = %d", irOld);
-      strcpy(dMess0, "Input");
-      strcpy(dMess1, "");
-      sprintf(dMess2, "LoopIntv= %d", task1Interval);
-      DispPage(dMess0, 0, 0, 0);
-      DispPage(dMess1, 1, 2, 0);
-      DispPage(dMess2, 2, 2, 0);
-      DispPage(dMess3, 3, 2, 0);
+      strcpy(row[0].message, "INPUT");
+      strcpy(row[1].message, "");
+      sprintf(row[2].message, "LoopIntv= %d", task1Interval);
+      strcpy(row[3].message, dMess3);
+      DispPage(row);
     } else if (irOld==IR_MENU) {
-      PresCheck(dMess2);
-      TempCheck(dMess3);
-      DispPage("BMP180", 0, 0, 0);
-      DispPage("", 1, 2, 0);
-      DispPage(dMess2, 2, 2, 0);
-      DispPage(dMess3, 3, 2, 0);
+      strcpy(row[0].message, "BMP180");
+      strcpy(row[1].message, "");
+      PresCheck(row[2].message);
+      TempCheck(row[3].message);
+      DispPage(row);
+    } else if (irOld==IR_TEST) {
+      strcpy(row[0].message, "HALL sensor");
+      strcpy(row[1].message, "");
+      sprintf(row[2].message, "Magnetic= %d", HallRead());
+      strcpy(row[3].message, "");
+      DispPage(row);
+    } else if (irOld==IR_BACK) {
+      uint32_t chipId = 0;
+	    for(int i=0; i<17; i=i+8) {
+        chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+      }
+      sprintf(row[0].message, "%s", ESP.getChipModel());
+      strcpy(row[1].message, " ");
+      sprintf(row[2].message, "Rev: %d has %d cores", ESP.getChipRevision(), ESP.getChipCores());
+      sprintf(row[3].message, "Chip ID: %d", chipId);
+      DispPage(row);
+    } else if (irOld==IR_1) {
+      GY521Read();
+      strcpy(row[0].message, "Angle:");
+      strcpy(row[1].message, "");
+      sprintf(row[2].message, "Pitch= %5.1f", GY521Pitch());
+      sprintf(row[3].message, "Roll = %5.1f", GY521Roll());
+      DispPage(row);
+    } else if (irOld==IR_2) {
+      GY521Read();
+      strcpy(row[0].message, "Accelerometer:");
+      sprintf(row[1].message, "X = %d", GY521AcX());
+      sprintf(row[2].message, "Y = %d", GY521AcY());
+      sprintf(row[3].message, "Z = %d", GY521AcZ());
+      DispPage(row);
+    } else if (irOld==IR_3) {
+      GY521Read();
+      strcpy(row[0].message, "Gyroscope:");
+      sprintf(row[1].message, "X = %d", GY521GyX());
+      sprintf(row[2].message, "Y = %d", GY521GyY());
+      sprintf(row[3].message, "Z = %d", GY521GyZ());
+      DispPage(row);
     } else if (irOld==IR_C) {
-      DispPage("ncenB10_tf", 0, 0, (cnt%4==0));
-      DispPage("ncenR10_tf", 1, 1, (cnt%4==1));
-      DispPage("helvR10_tf", 2, 2, (cnt%4==2));
-      DispPage("courR12_tf", 3, 3, (cnt%4==3));
+      DispRow("ncenB10_tf", 0, 0, (cnt%4==0));
+      DispRow("ncenR10_tf", 1, 1, (cnt%4==1));
+      DispRow("helvR10_tf", 2, 2, (cnt%4==2));
+      DispRow("courR12_tf", 3, 3, (cnt%4==3));
     } else
       DispClock(hour, minute, second);
 
@@ -78,8 +122,10 @@ void loop() {
     blink();
   }
 
+  //------------------------//
   //      T A S K   2       //
- if (millis() > task2) {
+  //------------------------//
+  if (millis() > task2) {
     task2 = millis() + task2Interval;
 
     uint8_t but = readBut();
@@ -87,8 +133,10 @@ void loop() {
     sprintf(dMess3, "Button  = %d", but);
   }
 
+  //------------------------//
   //      T A S K   3       //
- if (millis() > task3) {
+  //------------------------//
+  if (millis() > task3) {
     task3 = millis() + task3Interval;
 
     if (++second > 59) {
@@ -141,4 +189,26 @@ uint8_t readPot(uint8_t pot) {
 
 uint8_t readBut(void) {
   return digitalRead(KEY_0)*2 + digitalRead(KEY_1);
+}
+
+void PageInit(void) {
+  for (uint8_t i=0; i<4; i++) {
+     strcpy(row[i].message, "");
+    row[i].row = i;
+    row[i].font= 2;
+    row[i].selec= false;
+  }
+}
+
+int HallRead(void) {
+  static int hall[] = {25, 25, 25, 25, 25, 25, 25, 25};
+  static uint8_t inpIdx;
+  const uint8_t numHall = 8;
+  int totHall = 0;
+
+  hall[inpIdx%numHall] = hallRead();
+  for (uint8_t i=0; i<numHall; i++) totHall += hall[i];
+  inpIdx++;
+
+  return  (totHall / numHall);
 }
