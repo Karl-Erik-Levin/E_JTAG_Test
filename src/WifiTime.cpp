@@ -3,7 +3,7 @@
 #include "sntp.h"
 #include "WifiTime.h"
 
-extern uint8_t hour, minute, second;
+extern uint8_t hour, minute, second;    // Define in main.cpp
 
 const char* ssid       = "Ronnbaret";
 const char* password   = "626702KCf";

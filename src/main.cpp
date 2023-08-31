@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-#include "BoardPin.h"
+#include "Pin.h"
 #include "DispU8G2.h"
 #include "IrRemCtrl.h"
 #include "Weather.h"
@@ -9,40 +9,31 @@
 #include "WifiTime.h"
 
 void blink();
-void statusLed(uint8_t but);
-void PageInit(void);
-uint8_t readPot(uint8_t pot);
-uint8_t readBut(void);
-int HallRead(void);
+void clearPage(dispRow row[]);
 
-uint8_t hour=8, minute=48, second=12;
+
+uint8_t hour=8, minute=48, second=12;   // Also ref in WifiTime.cpp
 dispRow row[4];
 
 void setup() {
   Serial.begin(115200);
 
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(LED_RED, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_BLUE, OUTPUT);
-  pinMode(KEY_0, INPUT);
-  pinMode(KEY_1, INPUT);
-
+  PinInit();
   DispInit();
   IrInit();
   PresInit();
   GY521Init();
-  PageInit();
   WifiTimeInit();
+  clearPage(row);
 }
 
 void loop() {
   static uint32_t task1, task1Interval=100;
   static uint32_t task2, task2Interval=100;
-  static uint32_t task3, task3Interval=1000;
+  static uint32_t task3, task3Interval=1000, task3cnt;
   static IrKey irOld;
-  static uint8_t cnt;
-  static char dMess0[40], dMess1[40], dMess2[40], dMess3[40];
+  static uint8_t rowCnt;
+  static char butMessage[20];
 
   //------------------------//
   //      T A S K   1       //
@@ -50,13 +41,15 @@ void loop() {
   if (millis() > task1) {
     task1 = millis() + task1Interval;
 
-    task1Interval = readPot(0) + 10;
+    task1Interval = PinReadPot(0) + 10;
     IrKey ir = IrCheck();
 
-    if (ir==IR_DOWN) cnt++;
-    else if (ir==IR_UP) cnt--;
-    else if (ir > 0) irOld = ir;
-
+    if (ir==IR_DOWN) rowCnt++;
+    else if (ir==IR_UP) rowCnt--;
+    else if (ir > 0) {
+      irOld = ir;
+      clearPage(row);
+    }
     DispClear();
     
     if (irOld==IR_ON) {
@@ -64,7 +57,7 @@ void loop() {
       strcpy(row[0].message, "INPUT");
       strcpy(row[1].message, "");
       sprintf(row[2].message, "LoopIntv= %d", task1Interval);
-      strcpy(row[3].message, dMess3);
+      strcpy(row[3].message, butMessage);
       DispPage(row);
     } else if (irOld==IR_MENU) {
       strcpy(row[0].message, "BMP180");
@@ -84,23 +77,22 @@ void loop() {
         chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
       }
       sprintf(row[0].message, "%s", ESP.getChipModel());
-      strcpy(row[1].message, " ");
       sprintf(row[2].message, "Rev: %d has %d cores", ESP.getChipRevision(), ESP.getChipCores());
       sprintf(row[3].message, "Chip ID: %d", chipId);
       DispPage(row);
     } else if (irOld==IR_1) {
       GY521Read();
       strcpy(row[0].message, "Angle:");
-      strcpy(row[1].message, "");
-      sprintf(row[2].message, "Pitch= %5.1f", GY521Pitch());
-      sprintf(row[3].message, "Roll = %5.1f", GY521Roll());
+      sprintf(row[1].message, "Pitch = %5.1f", GY521Pitch());
+      sprintf(row[2].message, "Roll  = %5.1f", GY521Roll());
+      sprintf(row[3].message, "Resultant= %5.2f", GY521Resultant());
       DispPage(row);
     } else if (irOld==IR_2) {
       GY521Read();
       strcpy(row[0].message, "Accelerometer:");
-      sprintf(row[1].message, "X = %d", GY521AcX());
-      sprintf(row[2].message, "Y = %d", GY521AcY());
-      sprintf(row[3].message, "Z = %d", GY521AcZ());
+      sprintf(row[1].message, "X = %5.2f", GY521AcX());
+      sprintf(row[2].message, "Y = %5.2f", GY521AcY());
+      sprintf(row[3].message, "Z = %5.2f", GY521AcZ());
       DispPage(row);
     } else if (irOld==IR_3) {
       GY521Read();
@@ -109,11 +101,18 @@ void loop() {
       sprintf(row[2].message, "Y = %d", GY521GyY());
       sprintf(row[3].message, "Z = %d", GY521GyZ());
       DispPage(row);
+    } else if (irOld==IR_4) {
+      GY521Read();
+      strcpy(row[0].message, "Temperatur:");
+      sprintf(row[2].message, "Temp =%4.1f C", GY521TempC());
+      sprintf(row[3].message, "Temp =%4.1f F", GY521TempF());
+      DispPage(row);
     } else if (irOld==IR_C) {
-      DispRow("ncenB10_tf", 0, 0, (cnt%4==0));
-      DispRow("ncenR10_tf", 1, 1, (cnt%4==1));
-      DispRow("helvR10_tf", 2, 2, (cnt%4==2));
-      DispRow("courR12_tf", 3, 3, (cnt%4==3));
+      strcpy(row[0].message, "ncenB10_tf"), row[0].font=0, row[0].selec=(rowCnt%4==0);
+      strcpy(row[1].message, "ncenR10_tf"), row[1].font=1, row[1].selec=(rowCnt%4==1);
+      strcpy(row[2].message, "helvR10_tf"), row[2].font=2, row[2].selec=(rowCnt%4==2);
+      strcpy(row[3].message, "courR12_tf"), row[3].font=3, row[3].selec=(rowCnt%4==3);
+      DispPage(row);
     } else
       DispClock(hour, minute, second);
 
@@ -128,9 +127,9 @@ void loop() {
   if (millis() > task2) {
     task2 = millis() + task2Interval;
 
-    uint8_t but = readBut();
-    statusLed(but);
-    sprintf(dMess3, "Button  = %d", but);
+    uint8_t but = PinReadBut();
+    PinStatusLed(but);
+    sprintf(butMessage, "Button  = %d", but);
   }
 
   //------------------------//
@@ -148,6 +147,13 @@ void loop() {
         }
       }
     }
+
+    if (task3cnt < 300)
+      task3cnt++;
+    else {
+      task3cnt = 0;
+      WifiTimeRead();         // Update time from Internet
+    }
   }
 }
 
@@ -162,53 +168,12 @@ void blink() {
   count++;
 }
 
-void statusLed(uint8_t but) {
-  if (but==1)
-    digitalWrite(LED_RED, HIGH);
-  else
-    digitalWrite(LED_RED, LOW);
-
-  if (but==2)
-    digitalWrite(LED_GREEN, HIGH);
-  else
-    digitalWrite(LED_GREEN, LOW);
-
-  if (but==3)
-    digitalWrite(LED_BLUE, HIGH);
-  else
-    digitalWrite(LED_BLUE, LOW);
-}
-
-uint8_t readPot(uint8_t pot) {
-  uint8_t portPin = POT0;
-  if (pot == 1) portPin = POT1;
-
-  long val = analogRead(portPin);
-  return map(val , 0, 4095, 0, 255);
-}
-
-uint8_t readBut(void) {
-  return digitalRead(KEY_0)*2 + digitalRead(KEY_1);
-}
-
-void PageInit(void) {
+void clearPage(dispRow row[]) {
   for (uint8_t i=0; i<4; i++) {
-     strcpy(row[i].message, "");
-    row[i].row = i;
-    row[i].font= 2;
+    strcpy(row[i].message, "");
+    row[i].row  = i;
+    row[i].font = 2;
     row[i].selec= false;
   }
 }
 
-int HallRead(void) {
-  static int hall[] = {25, 25, 25, 25, 25, 25, 25, 25};
-  static uint8_t inpIdx;
-  const uint8_t numHall = 8;
-  int totHall = 0;
-
-  hall[inpIdx%numHall] = hallRead();
-  for (uint8_t i=0; i<numHall; i++) totHall += hall[i];
-  inpIdx++;
-
-  return  (totHall / numHall);
-}
