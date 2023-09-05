@@ -1,11 +1,11 @@
 #include "BoardPin.h"
 #include "IrRemCtrl.h"
 
-IRrecv irrecv(recvPin);         // Create a class object used to receive class
+IRrecv irrecv(RECV_PIN);        // Create a class object used to receive class
 decode_results results;         // Create a decoding results class object
 
 void IrInit(void) {
-  irrecv.enableIRIn();        // Start the receiver
+  irrecv.enableIRIn();          // Start the receiver
 }
 
 IrKey IrCheck(void) {

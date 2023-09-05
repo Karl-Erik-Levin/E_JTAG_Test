@@ -5,15 +5,15 @@
 void getAngle(int Ax, int Ay, int Az);
 
 const int MPU = 0x68;
-const uint8_t numSamp = 8;
-//const int AcXcal=-75, AcYcal=270, AcZcal=-7700;
-const int AcXcal=0, AcYcal=0, AcZcal=-1391;
-const int GyXcal=610, GyYcal=-140, GyZcal=-60, tcal=-6370;
-int16_t AcX, AcY, AcZ;
-int16_t Tmp, GyX, GyY, GyZ;
-int16_t AcXsamp[numSamp], AcYsamp[numSamp], AcZsamp[numSamp];
-int AcXtot, AcYtot, AcZtot;
+const uint8_t numSamp = 6;
 uint8_t samp;
+
+const int AcXcal=0, AcYcal=0, AcZcal=-1391;
+const int GyXcal=625, GyYcal=-140, GyZcal=-70, tcal=-6370;
+int16_t AcX, AcY, AcZ, GyX, GyY, GyZ, Tmp;
+int16_t AcXsamp[numSamp], AcYsamp[numSamp], AcZsamp[numSamp];
+int16_t GyXsamp[numSamp], GyYsamp[numSamp], GyZsamp[numSamp];
+int Xtot, Ytot, Ztot;
 double t, tx, tf, pitch, roll;
 
 void GY521Init(void) {
@@ -28,7 +28,7 @@ void GY521Read(void) {
   Wire.beginTransmission(MPU);
   Wire.write(0x3B);
   Wire.endTransmission(false);
-  Wire.requestFrom(MPU, 14, true);
+  Wire.requestFrom(MPU, 14, 1);
   AcX = Wire.read() << 8 | Wire.read();
   AcY = Wire.read() << 8 | Wire.read();
   AcZ = Wire.read() << 8 | Wire.read();
@@ -44,12 +44,22 @@ void GY521Read(void) {
   getAngle(AcX, AcY, AcZ);
 
   AcXsamp[samp%numSamp]=AcX, AcYsamp[samp%numSamp]=AcY, AcZsamp[samp%numSamp]=AcZ;
-  AcXtot = AcYtot = AcZtot = 0;
+  GyXsamp[samp%numSamp]=GyX, GyYsamp[samp%numSamp]=GyY, GyZsamp[samp%numSamp]=GyZ;
+
+  Xtot = Ytot = Ztot = 0;
   for (uint8_t i=0; i<numSamp; i++) {
-    AcXtot += AcXsamp[i], AcYtot += AcYsamp[i], AcZtot += AcZsamp[i];
+    Xtot += AcXsamp[i], Ytot += AcYsamp[i], Ztot += AcZsamp[i];
   }
-  AcX = AcXtot / numSamp, AcY = AcYtot /numSamp, AcZ = AcZtot /numSamp;
+  AcX = Xtot / numSamp, AcY = Ytot /numSamp, AcZ = Ztot /numSamp;
+
+  Xtot = Ytot = Ztot = 0;
+  for (uint8_t i=0; i<numSamp; i++) {
+    Xtot += GyXsamp[i], Ytot += GyYsamp[i], Ztot += GyZsamp[i];
+  }
+  GyX = Xtot / numSamp, GyY = Ytot /numSamp, GyZ = Ztot /numSamp;
+
   samp++;
+  if (samp >= numSamp) samp=0;
 }
 
 void getAngle(int Ax, int Ay, int Az) {

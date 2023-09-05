@@ -7,7 +7,7 @@
 // GY521, MPU-6050 3-axis gyroscope and acceleration_
 
 // Infrared receiving pin
-#define recvPin 2       // GPIO 2
+#define RECV_PIN 26     // GPIO 26
 
 #ifndef LED_BUILTIN
 #define LED_BUILTIN 27  // GPIO 27
