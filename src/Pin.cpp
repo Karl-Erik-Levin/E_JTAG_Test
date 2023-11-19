@@ -50,6 +50,6 @@ int HallRead(void) {
   for (uint8_t i=0; i<numHall; i++) totHall += hall[i];
   inpIdx++;
 
-  return  (totHall / numHall);
+  return  ((totHall / numHall)/10 - 3);
 }
 
